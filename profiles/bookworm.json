@@ -1,0 +1,22 @@
+{
+  "name": "bookworm",
+  "php_version": "8.4.26",
+  "image": "php:8.4.26-apache",
+  "description": "Official php:8.4.26-apache (Debian bookworm, Apache prefork). Default lab profile; PHP 8.4.26 build.",
+  "zif_offset": "0x465370",
+  "dtor_offset": "0x65eb60",
+  "htdata_offset": "0x690d8",
+  "stage1_n": 841,
+  "stage2_t": 406,
+  "stage2_v": 16,
+  "stage3_pads": [
+    [31, 31],
+    [31, 31],
+    [31, 31],
+    [31, 31],
+    [31, 31],
+    [31, 31]
+  ],
+  "stage3_carrier": true,
+  "stage3_cookie": true
+}
