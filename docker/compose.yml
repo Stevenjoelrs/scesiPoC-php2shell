@@ -1,0 +1,63 @@
+# php2shell lab -- local, loopback-only reproduction of the THM target.
+#
+# Both services use the *official* PHP Apache images (no local build), so the
+# only variable between them is the PHP patch level:
+#
+#   vuln    php:8.4.26-apache  -> vulnerable to CVE-2026-109618 / CVE-2026-109619
+#   patched php:8.4.27-apache  -> patched control
+#
+# The patched service is opt-in (`profiles: [patched]`) so a plain
+# `docker compose up -d` only starts the vulnerable target.
+#
+# Run through the Makefile, which materialises runtime/f and runtime/out first:
+#   make lab-up          # vuln only
+#   make lab-up-patched  # vuln + patched
+
+name: php2shell
+
+x-lab-common: &lab-common
+  platform: ${PLATFORM:-linux/amd64}
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1/"]
+    interval: 3s
+    timeout: 3s
+    retries: 30
+    start_period: 10s
+
+services:
+  vuln:
+    <<: *lab-common
+    image: ${VULN_IMAGE:-php:8.4.26-apache}
+    container_name: php2shell-vuln
+    environment:
+      LAB_ROLE: vuln
+      PHP_VERSION_LABEL: "8.4.26"
+      FLAG_PATH: /f
+    ports:
+      # Loopback only: this is a deliberately exploitable container.
+      - "127.0.0.1:${VULN_PORT:-8088}:80"
+    volumes:
+      - ./php/lab-8m.ini:/usr/local/etc/php/conf.d/zz-php2shell.ini:ro
+      - ./apache/single-worker.conf:/etc/apache2/conf-enabled/zz-php2shell.conf:ro
+      - ./www:/var/www/html:ro
+      - ../runtime/out:/out
+      - ../runtime/f:/f:ro
+
+  patched:
+    <<: *lab-common
+    profiles: ["patched"]
+    image: ${PATCHED_IMAGE:-php:8.4.27-apache}
+    container_name: php2shell-patched
+    environment:
+      LAB_ROLE: patched
+      PHP_VERSION_LABEL: "8.4.27"
+      FLAG_PATH: /f
+    ports:
+      - "127.0.0.1:${PATCHED_PORT:-8089}:80"
+    volumes:
+      - ./php/lab-8m.ini:/usr/local/etc/php/conf.d/zz-php2shell.ini:ro
+      - ./apache/single-worker.conf:/etc/apache2/conf-enabled/zz-php2shell.conf:ro
+      - ./www:/var/www/html:ro
+      - ../runtime/patched/out:/out
+      - ../runtime/f:/f:ro

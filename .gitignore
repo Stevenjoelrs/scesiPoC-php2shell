@@ -1,0 +1,29 @@
+# Local environment
+.env
+
+# Runtime state: proof output, synthetic flag, session dumps
+runtime/
+
+# Exploit results (keep the directory, not the data)
+results/*
+!results/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Logs and captures
+*.log
