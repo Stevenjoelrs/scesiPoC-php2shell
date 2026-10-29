@@ -27,3 +27,6 @@ dist/
 
 # Logs and captures
 *.log
+
+# Local upstream reference material (not part of the PoC)
+refs/
