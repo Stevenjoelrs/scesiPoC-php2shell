@@ -39,6 +39,9 @@ runtime:
 	@mkdir -p runtime/out runtime/patched/out
 	@test -f runtime/f || printf '%s\n' "$(SYNTHETIC_FLAG)" > runtime/f
 	@chmod 0644 runtime/f
+	@# Docker Desktop's VirtioFS ignores chown from inside the container, so
+	@# the www-data worker can only write /out if the host dir is world-writable.
+	@chmod 0777 runtime/out runtime/patched/out
 
 compose-check: env runtime
 	@$(COMPOSE) config >/dev/null && echo "compose.yml: OK"

@@ -1,10 +1,10 @@
 #!/bin/sh
 # php2shell lab entrypoint wrapper.
 #
-# The host bind-mounts runtime/out, which Docker creates as root. The Apache
-# worker runs as www-data, so hand it ownership before starting the server.
-# Everything else is delegated to the official image entrypoint, keeping the
-# lab as close to a stock php:8.4.x-apache container as possible.
+# The host bind-mounts runtime/out. On Linux this chown is enough to let the
+# Apache worker (www-data) write proofs. Docker Desktop's VirtioFS ignores
+# ownership changes on bind mounts, so the Makefile also makes the host
+# directories world-writable for local labs.
 set -eu
 
 mkdir -p /out
