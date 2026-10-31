@@ -24,14 +24,18 @@ from .http import HttpClient
 from .lab import (
     LabError,
     compose,
+    compose_version,
     container_health,
     container_image,
     container_state,
+    docker_platform,
     docker_server_version,
     ensure_runtime,
     exec_in,
+    normalize_platform,
     php_ini,
     php_version,
+    selinux_enforcing,
     wait_healthy,
 )
 from .offsets import OffsetsError, from_container, offsets_from_env, write_env
@@ -480,6 +484,29 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         return 1
 
     try:
+        print("compose: {} (v2 plugin)".format(compose_version()))
+    except LabError as exc:
+        print("compose: ERROR ({})".format(exc))
+        failures.append("docker compose v2")
+
+    try:
+        daemon_platform = docker_platform()
+        print("platform: daemon {} target {}".format(daemon_platform, lab.platform))
+        if normalize_platform(daemon_platform) != normalize_platform(lab.platform):
+            print("  emulated target: the containers run under {}".format(lab.platform))
+            if sys.platform.startswith("linux"):
+                print(
+                    "  WARNING: on Linux arm64 install binfmt/QEMU for amd64, e.g.\n"
+                    "           docker run --privileged --rm tonistiigi/binfmt --install amd64"
+                )
+    except LabError as exc:
+        print("platform: ERROR ({})".format(exc))
+        failures.append("docker platform")
+
+    if sys.platform.startswith("linux") and selinux_enforcing():
+        print("selinux: enforcing (bind mounts may need :z; see docs/lab.md)")
+
+    try:
         compose(lab, ["config", "--quiet"])
         print("compose: valid")
     except LabError as exc:
@@ -490,17 +517,22 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         state = container_state(name)
         health = container_health(name)
         print("{}: state={} health={}".format(name, state, health))
-        if state == "running":
-            print("  image={} php={}".format(
-                container_image(name), php_version(name)
-            ))
-            print("  memory_limit={} display_errors={} upload_progress={}".format(
-                php_ini(name, "memory_limit"),
-                php_ini(name, "display_errors"),
-                php_ini(name, "session.upload_progress.enabled"),
-            ))
-            writable = exec_in(name, ["sh", "-c", "test -w /out && echo yes || echo no"])
-            print("  /out writable: {}".format(writable.stdout.strip() or "unknown"))
+        if state != "running":
+            if name == lab.vuln_container:
+                failures.append("vuln container not running")
+            else:
+                print("  (optional patched control not running)")
+            continue
+        print("  image={} php={}".format(
+            container_image(name), php_version(name)
+        ))
+        print("  memory_limit={} display_errors={} upload_progress={}".format(
+            php_ini(name, "memory_limit"),
+            php_ini(name, "display_errors"),
+            php_ini(name, "session.upload_progress.enabled"),
+        ))
+        writable = exec_in(name, ["sh", "-c", "test -w /out && echo yes || echo no"])
+        print("  /out writable: {}".format(writable.stdout.strip() or "unknown"))
 
     ensure_runtime(lab)
     size = lab.flag_file.stat().st_size if lab.flag_file.exists() else 0

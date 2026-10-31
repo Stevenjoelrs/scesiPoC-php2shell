@@ -133,6 +133,50 @@ def docker_server_version() -> str:
     return result.stdout.strip()
 
 
+_ARCH_ALIASES = {
+    "x86_64": "amd64",
+    "amd64": "amd64",
+    "aarch64": "arm64",
+    "arm64": "arm64",
+}
+
+
+def normalize_platform(value: str) -> str:
+    """Normalise ``linux/x86_64`` and ``linux/amd64`` to the same string."""
+    os_type, _, arch = value.strip().partition("/")
+    return "{}/{}".format(os_type, _ARCH_ALIASES.get(arch, arch))
+
+
+def docker_platform() -> str:
+    """Return the daemon platform as ``ostype/arch`` (e.g. ``linux/amd64``)."""
+    result = _run(
+        [DOCKER, "info", "--format", "{{.OSType}}/{{.Architecture}}"],
+        timeout=30,
+    )
+    if result.returncode != 0:
+        raise LabError(result.stderr.strip() or "cannot read docker platform")
+    return normalize_platform(result.stdout.strip())
+
+
+def compose_version() -> str:
+    """Return the Docker Compose v2 version, or raise if only v1 is present."""
+    result = _run([DOCKER, "compose", "version", "--short"], timeout=20)
+    if result.returncode != 0:
+        raise LabError(
+            result.stderr.strip()
+            or "docker compose v2 is required (the 'docker compose' plugin)"
+        )
+    return result.stdout.strip().splitlines()[0] if result.stdout.strip() else "unknown"
+
+
+def selinux_enforcing() -> bool:
+    """Best-effort host SELinux check (always False outside Linux)."""
+    try:
+        return Path("/sys/fs/selinux/enforce").read_text(encoding="utf-8").strip() == "1"
+    except OSError:
+        return False
+
+
 def container_image(container: str) -> str:
     result = _run([DOCKER, "inspect", "-f", "{{.Config.Image}}", container], timeout=20)
     if result.returncode != 0:
