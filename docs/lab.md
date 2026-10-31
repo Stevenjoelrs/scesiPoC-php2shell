@@ -146,15 +146,54 @@ make lab-reset         # limpia /out
 make lab-down
 ```
 
+## Linux
+
+El laboratorio se validó en macOS arm64 con Docker Desktop. El diseño es
+portable a Linux, pero no se ha ejecutado en un host Linux dentro de este
+repositorio; estos son los puntos a comprobar:
+
+- **Docker Engine + Compose v2.** El compose usa `name:`, `profiles:` y
+  `platform:`, así que necesita el plugin `docker compose` (v2), no el antiguo
+  `docker-compose`.
+- **Python 3.9+.** Ubuntu 20.04 trae 3.8 por defecto; instala `python3.9` o
+  superior. `make doctor` lo comprueba.
+- **x86_64.** Funciona de forma nativa con las imágenes `linux/amd64`.
+- **arm64.** Docker necesita binfmt/QEMU para ejecutar `linux/amd64`:
+
+  ```sh
+  docker run --privileged --rm tonistiigi/binfmt --install amd64
+  ```
+
+  La emulación es más lenta; si una etapa agota los reintentos, súbelos con
+  `--retries` o `RETRIES` en el CLI.
+- **SELinux (Fedora/RHEL).** Con SELinux enforcing, los bind mounts sin
+  etiqueta pueden dar `Permission denied` al leer la ini, el entrypoint o
+  `/var/www/html`. Añade `:z` a los montajes del compose (por ejemplo,
+  `./php/lab-8m.ini:/...:ro,z`) o usa un host con SELinux permisivo. En
+  Ubuntu/Debian (AppArmor) no hace falta.
+- **Paginación de 5 niveles (LA57).** El leak acepta la ventana clásica de
+  47 bits y la ventana alta de 56 bits, pero si el kernel mapea el heap en un
+  rango inesperado y la etapa 1 falla siempre, prueba a arrancar con `no5lvl` o
+  revisa `cat /proc/self/maps`.
+- **Docker rootless.** El directorio `/out` se deja en `0777`; el `chown` del
+  entrypoint puede fallar sin privilegios, pero la escritura sigue funcionando.
+
+`make doctor` muestra la plataforma del daemon, avisa si el target es emulado y
+detecta SELinux enforcing.
+
 ## Diagnóstico
 
 | Síntoma | Causa probable | Solución |
 | --- | --- | --- |
-| `docker daemon unavailable` | Docker Desktop parado | arráncalo y repite |
+| `docker daemon unavailable` | Docker Desktop/Engine parado | arráncalo y repite |
+| `'compose' is not a docker command` | solo Compose v1 | instala el plugin `docker compose` v2 |
 | `no matching manifest` | plataforma distinta | deja `PLATFORM=linux/amd64` |
+| `exec format error` | Linux arm64 sin binfmt | `docker run --privileged --rm tonistiigi/binfmt --install amd64` |
+| `Permission denied` en montajes | SELinux enforcing | añade `:z` a los bind mounts |
 | `bind: address already in use` | puerto ocupado | cambia `VULN_PORT`/`PATCHED_PORT` en `.env` |
 | `/out` no escribible | VirtioFS/permisos | `make runtime` (aplica `0777`) |
 | etapa 1 falla siempre | worker ocupado o config distinta | `make lab-reset`, revisa `lab-8m.ini`, rota el worker |
+| etapa 1 falla en Linux LA57 | direcciones fuera del rango esperado | arranca el kernel con `no5lvl` |
 | contenedor en restart | entrypoint sin comando | verifica `command: ["apache2-foreground"]` en el compose |
 
 ## Limpieza

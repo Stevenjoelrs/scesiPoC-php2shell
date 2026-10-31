@@ -20,7 +20,7 @@ PoC completo y reproducible:
 - extracción automática de offsets desde el `libphp.so` del contenedor;
 - detección pasiva por banner y *probe* conductual de la etapa 1;
 - matriz vulnerable/parcheado con veredicto y JSON reproducible;
-- 67 tests unitarios sin Docker;
+- 72 tests unitarios sin Docker;
 - documentación técnica y blog en español.
 
 Resultado de la última matriz (`PATCHED_CONTROL_OK`):
@@ -51,7 +51,7 @@ poc/
   lab.py                     estado de contenedores y docker compose
   cli.py                     subcomandos
 profiles/                    bookworm.json (oficial), lab.json (histórico)
-tests/                       67 tests stdlib unittest
+tests/                       72 tests stdlib unittest
 docs/                        laboratorio, arquitectura, etapas, resultados, blog
 runtime/                     flag sintética y proofs (ignorado por git)
 results/                     matrices JSON (ignorado por git)
@@ -59,11 +59,35 @@ results/                     matrices JSON (ignorado por git)
 
 ## Requisitos
 
-- Docker Engine / Docker Desktop con el daemon arrancado.
-- En Apple Silicon: emulación `linux/amd64` (Docker Desktop la incluye). El
-  compose fija `platform: linux/amd64` para que los offsets y el layout de
-  `libphp.so` coincidan con el binario x86-64 del laboratorio.
+- Docker Engine / Docker Desktop con el daemon arrancado y el plugin
+  **Compose v2** (`docker compose`, no `docker-compose`).
 - Python 3.9 o superior (el PoC evita sintaxis de 3.10+).
+- El compose fija `platform: linux/amd64` para que los offsets y el layout de
+  `libphp.so` coincidan con el binario x86-64 del laboratorio.
+
+### Compatibilidad de host
+
+| Host | Estado | Notas |
+| --- | --- | --- |
+| Linux x86_64 | nativo | Docker Engine + Compose v2; es el caso esperado |
+| Linux arm64 | con emulación | requiere binfmt/QEMU para `linux/amd64` |
+| macOS arm64 | con Docker Desktop | emulación integrada |
+| macOS x86_64 | nativo | Docker Desktop |
+
+El laboratorio se validó en macOS arm64 con Docker Desktop. No se ha ejecutado
+en un host Linux real dentro de este repositorio, pero el diseño no depende de
+macOS: usa Docker, Compose v2 y Python estándar. `make doctor` comprueba lo
+básico antes de lanzar el exploit.
+
+En Linux arm64, registra el emulador antes de arrancar el laboratorio:
+
+```sh
+docker run --privileged --rm tonistiigi/binfmt --install amd64
+```
+
+En Fedora/RHEL con SELinux enforcing, los bind mounts pueden necesitar la
+etiqueta `:z`; en Ubuntu/Debian no hace falta. `make doctor` avisa de los casos
+más comunes. Detalles en [`docs/lab.md`](docs/lab.md#linux).
 
 ## Arranque rápido
 
@@ -97,7 +121,7 @@ disposición del laboratorio original.
 | `make exploit CMD='cat /f>/out/p1'` | lee la flag sintética (14 bytes) |
 | `make detect` | fingerprint pasivo por `X-Powered-By` |
 | `make matrix` | ejecuta vulnerable y parcheado, guarda JSON |
-| `make check` | `compileall` + 67 tests |
+| `make check` | `compileall` + 72 tests |
 | `make lab-reset` | limpia `runtime/out` |
 | `make lab-down` | para y elimina los contenedores |
 

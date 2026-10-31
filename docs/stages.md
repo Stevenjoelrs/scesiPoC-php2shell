@@ -51,9 +51,11 @@ Objetivo: obtener la base de 2 MB del chunk de Zend MM.
    `+0x18` el byte `L`.
 3. PHP serializa ese string falso en la cookie `PHPSESSID`; la respuesta lleva
    una cookie URL-encoded de **4096 bytes**.
-4. El parser decodifica la cookie y busca valores de 8 bytes en
-   `[0x7f0000000000, 0x800000000000)`. Agrupa por `valor & ~0x1FFFFF` (2 MB) y
-   se queda con la moda; exige al menos 8 apariciones.
+4. El parser decodifica la cookie y busca valores de 8 bytes que caigan en una
+   de las dos ventanas canónicas de usuario: la clásica de 47 bits
+   (`0x7f0000000000..0x800000000000`) o la alta de 5 niveles
+   (`2**55..2**56`). Agrupa por `valor & ~0x1FFFFF` (2 MB) y se queda con la
+   moda; exige al menos 8 apariciones.
 
 En el laboratorio:
 

