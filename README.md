@@ -1,14 +1,14 @@
 # PHP2Shell — PoC local (CVE-2026-109618 / CVE-2026-109619)
 
-Reproducción **solo de laboratorio** de la cadena *PHP2Shell*: una corrupción
+Reproducción de la cadena *PHP2Shell*: una corrupción
 de estado en el camino de *bailout* de PHP que, con `memory_limit` bajo y
 sesiones con *upload progress*, permite filtrar el heap y la base de
 `libphp.so` por `Set-Cookie`, escribir una referencia falsa y ejecutar
 comandos vía `zif_system` sobre Apache `mod_php` con un worker prefork.
 
-> **Aviso**: este repositorio ejecuta un contenedor deliberadamente vulnerable y
-> contiene código de explotación. Úsalo únicamente contra las instancias locales
-> que levanta el propio proyecto. No lo apuntes a sistemas de terceros.
+> este repo ejecuta un contenedor deliberadamente vulnerable y
+> contiene código de explotación. usarse únicamente contra las instancias locales
+> que levanta el propio proyecto. No lo apuntar a sistemas de terceros.
 
 ## Estado
 
@@ -179,26 +179,6 @@ leak está bloqueado; no demuestra de forma independiente que la etapa 3 esté
 bloqueada, porque la cadena no llega a ella.
 
 Detalle completo en [`docs/results.md`](docs/results.md).
-
-## Fidelidad con el laboratorio de THM
-
-| Elemento | THM / referencia | Este repo |
-| --- | --- | --- |
-| Imagen vulnerable | `php:8.4.26-apache` | igual, imagen oficial |
-| Imagen parcheada | — | `php:8.4.27-apache` |
-| `memory_limit` | `8M` | igual |
-| Errores | `display_errors=On`, `E_ALL` | igual |
-| Upload progress | activo, `cleanup=On` | igual |
-| Apache | prefork, 1 worker, `KeepAlive Off` | igual |
-| Flag | `/f` | `/f` (sintética) |
-| Salida | `/out` | `/out` |
-| Puertos | remotos | solo `127.0.0.1` |
-
-No hay build propio del target: se usan las imágenes oficiales para que la
-única diferencia entre vulnerable y parcheado sea el nivel de PHP.
-
-El healthcheck comprueba el PID de Apache, no HTTP, para no perturbar el único
-worker entre peticiones de grooming.
 
 ## Configuración
 
